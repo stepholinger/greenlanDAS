@@ -1,0 +1,6 @@
+borehole_data/
+figures/
+*mseed
+*h5
+*png
+*jld2
