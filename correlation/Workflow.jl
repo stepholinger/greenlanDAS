@@ -8,7 +8,6 @@ include("Nodal.jl")
 include("Misc.jl")
 
 
-# workflow with fk filtering
 function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm,
                   chans,output_times,out_path,samples_per_file=[])
     
@@ -16,6 +15,9 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
 # optimized: preprocess > rfft > fk > irfft (space) > whiten > correlate
 # the preprocess function does resample/detrend/taper/filter/1bit/slice
 # compromise: 
+    
+    # choose GPU
+    device!(1)    
     
     # read the first file and collect metadata
     N = read_nodal("segy", files[1])
@@ -26,7 +28,7 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
     seconds_per_file = samples_per_file/N.fs[1]
     num_files = length(files)
     num_chans = chans[2]-chans[1]+1
-    midpoint = Int64(chans[1]+(chans[2]+1-chans[1])/2-1)
+    midpoint = Int64(chans[1]+(chans[2]-chans[1])/2-1)
 
     # make iterator for saving substacks
     t = 1
@@ -46,51 +48,82 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
         
             # read the file
             N = read_nodal("segy", files[i])[chans[1]:chans[end]]
+#             println("Read "*files[i])
+#             flush(stdout)
 
-                # check that file is correct length
-                if N.info["orignx"] == samples_per_file && isempty(N.data) == false
-                    # preprocess
-                    resample!(N,fs)
-                    detrend!(N)
-                    taper!(N)
-                    bandpass!(N,freqmin,freqmax,zerophase=true)
+            # check that file is correct length
+            if size(N.data)[1] == samples_per_file && isempty(N.data) == false
+                 
+#                 println("Checked "*files[i])
+#                 flush(stdout)
+                
+                # preprocess
+                resample!(N,fs)
+                detrend!(N)
+                taper!(N)
+                bandpass!(N,freqmin,freqmax,zerophase=true)
+                 
+#                 println("Resampled, detrended, tapered, and bandpassed "*files[i])
+#                 flush(stdout)
+                              
+                # send to GPU
+                N.data = N.data |> cu
 
-                    # send to GPU
-                    N.data = N.data |> cu
+                # apply fk filter to each leg of the cable
+                split = midpoint-chans[1]+1
+                N_leg_1 = N[1:split]
+                N_leg_2 = N[split+1:end]
+                NF_leg_1 = rfft(N_leg_1,[1,2])
+                NF_leg_2 = rfft(N_leg_2,[1,2])
+                fk!(NF_leg_1,cmin,cmax,sgn)
+                fk!(NF_leg_2,cmin,cmax,sgn)
+                N_leg_1 = irfft(NF_leg_1,[1,2])
+                N_leg_2 = irfft(NF_leg_2,[1,2])
+                N = merge_channels(N_leg_1,N_leg_2,2)
 
-                    # apply fk filter to each leg of the cable
-                    split = midpoint-chans[1]+1
-                    N_leg_1 = N[1:split]
-                    N_leg_2 = N[split+1:end]
-                    NF_leg_1 = rfft(N_leg_1,[1,2])
-                    NF_leg_2 = rfft(N_leg_2,[1,2])
-                    fk!(NF_leg_1,cmin,cmax,sgn)
-                    fk!(NF_leg_2,cmin,cmax,sgn)
-                    N_leg_1 = irfft(NF_leg_1,[1,2])
-                    N_leg_2 = irfft(NF_leg_2,[1,2])
-                    N = merge_channels(N_leg_1,N_leg_2,2)
+#                 println("FK filtered "*files[i])
+#                 flush(stdout)
+                
+                # spectral whitening- probably can group fk and whitening to remove one fft
+                # need to get updated whitening code up to snuff
+                NF = rfft(N,[1])
+                whiten!(NF,freqmin,freqmax)
+                N = irfft(NF,[1])
 
-                    # spectral whitening- probably can group fk and whitening to remove one fft
-                    # need to get updated whitening code up to snuff
-                    NF = rfft(N,[1])
-                    whiten!(NF,freqmin,freqmax)
-                    N = irfft(NF,[1])
+#                 println("Whitened "*files[i])
+#                 flush(stdout)
+                
+                # one bit normalization
+                N.data .= sign.(N.data)
 
-                    # one bit normalization
-                    N.data .= sign.(N.data)
-
-                    # slice
-                    sliced_data = slice(N,10)
-                    NP = NodalProcessedData(N.n,size(sliced_data)[1],N.ox,N.oy,N.oz,N.info,N.id,N.name,
-                               N.loc,fs*ones(N.n),N.gain,Float64(freqmin),Float64(freqmax),cc_len,"1bit",
-                               N.resp,N.units,N.src,N.misc,N.notes,N.t,sliced_data)
-
-                    # cross correlate- CHECKED
-                    NF = rfft(NP,[1])
-                    corr = correlate(NF,Int64(maxlag*NF.fs[1]))
-                    corr_mat = corr_mat + sum(corr,dims=3)
-                end
-            
+#                 println("One-bit normalized "*files[i])
+#                 flush(stdout)
+                
+                # slice
+                sliced_data = slice(N,10)
+                NP = NodalProcessedData(N.n,size(sliced_data)[1],N.ox,N.oy,N.oz,N.info,N.id,N.name,
+                           N.loc,fs*ones(N.n),N.gain,Float64(freqmin),Float64(freqmax),cc_len,"1bit",
+                           N.resp,N.units,N.src,N.misc,N.notes,N.t,sliced_data)
+                
+#                 println("Sliced "*files[i])
+#                 flush(stdout)
+                
+                # cross correlate- CHECKED
+                NF = rfft(NP,[1])
+                corr = correlate(NF,Int64(maxlag*NF.fs[1]))
+                println("Correlated "*files[i])
+                flush(stdout)
+                corr_mat .= corr_mat .+ sum(corr,dims=3)
+                println("Summed correlations for "*files[i])
+                flush(stdout)
+                
+            # report failed file check
+            else
+                msg = "Fewer samples than expected!"
+                error_string = "\nDid not correlate file "*files[i]*"\n"*msg*"\n"
+                write(error_file,error_string)
+             end
+                
         # exception handling
         catch error
             bt = backtrace()
@@ -102,18 +135,17 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
         # count time steps and save output
         if i > 1
             datetime = datetime + Second(seconds_per_file)
-        end       
+        end   
         if datetime <= output_times[t] && datetime+Second(seconds_per_file) > output_times[t]
             t = t + 1
-            corr_mat = real(reshape(Array(corr_mat),size(corr_mat,1),size(corr_mat,2)))
             NC = NodalCorrData(NF.n,NF.ox,NF.oy,NF.oz,NF.info,NF.id,NF.name,NF.loc,NF.fs,
                                NF.gain,NF.freqmin,NF.freqmax,cc_len,maxlag,"1bit",true,NF.resp,NF.units,
-                               NF.src,NF.misc,NF.notes,NF.t,corr_mat)
+                               NF.src,NF.misc,NF.notes,NF.t,real(Array(corr_mat)))
             fname = string(out_path,"correlations_",datetime,".jld2")
             JLD2.save(fname,Dict("NodalCorrData"=>NC))
 
             # clear output matrix
-            corr_mat = zeros(Int64((maxlag*fs)*2+1), Int64(num_chans*(num_chans-1)/2)) |> cu
+            corr_mat .= 0
         end
         
     end
@@ -124,7 +156,7 @@ end
 
 
 # workflow without fk filtering
-function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,time_norm,
+function workflow_no_fk(files,cc_len,maxlag,freqmin,freqmax,fs,time_norm,
                   chans,output_times,out_path,samples_per_file=[])
     
 # baseline: resample > fk > detrend/taper/filter > whiten > 1bit > slice > correlate
@@ -151,7 +183,7 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,time_norm,
     global NF = rfft(N,[1])
     
     # open file for error handling
-    error_file = open(out_path*"errors.txt", "a")
+    error_file = open(out_path*"errors.txt", "w")
     
     # iterate through each file
     for i=1:num_files

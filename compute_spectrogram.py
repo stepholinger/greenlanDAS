@@ -29,7 +29,7 @@ def compute_spectrogram(file,window_length,noverlap):
 
 
 
-def compute_and_plot_spectrogram(file,window_length,noverlap):
+def compute_and_plot_spectrogram(file,window_length,noverlap,out_path):
     
     # read the file
     st = obspy.read(file)
@@ -44,7 +44,7 @@ def compute_and_plot_spectrogram(file,window_length,noverlap):
 
     # set output parameters
     channel = file.split("_")[1].split(".")[0]
-    fname = "/fd1/solinger/spectrograms/channel_"+channel+".png"
+    fname = out_path + "channel_"+channel+".png"
     title = "Channel " + channel
     
     # make a plot and record
@@ -90,7 +90,7 @@ def plot_spectrogram(st,f,t,s,title,fname):
     plt.close()
     
     
-def compute_and_save_spectrogram(file,window_length,noverlap):
+def compute_and_save_spectrogram(file,window_length,noverlap,out_path):
     
     # read the file
     st = obspy.read(file)
@@ -107,14 +107,14 @@ def compute_and_save_spectrogram(file,window_length,noverlap):
     channel = file.split("_")[1].split(".")[0]
     
     # save spectrogram data
-    save_spectrogram(f,t,s,channel)
+    save_spectrogram(f,t,s,channel,out_path)
     
     return f,t,s,channel
     
     
-def save_spectrogram(f,t,s,channel):
+def save_spectrogram(f,t,s,channel,out_path):
 
-    fname = "/fd1/solinger/spectrograms/channel_"+channel+".h5"
+    fname = out_path + "channel_"+channel+".h5"
 
     # save array of spectrograms to h5
     hfile = h5py.File(fname, 'w')

@@ -96,7 +96,7 @@ function rfft(N::NodalData,dims::Vector{Int64}=[1])
 end
 
 
-# standard SeisNoise rfft defined for NodalData
+# standard SeisNoise rfft defined for NodalProcessedData
 function rfft(NP::NodalProcessedData,dims::Vector{Int64}=[1])
     FFT = rfft(NP.data,dims)
     ns = size(NP.data)[1]
@@ -188,7 +188,7 @@ function whiten!(NF::NodalFFTData,freqmin::Real, freqmax::Real, pad::Int=50)
     @assert freqmax <= N.fs[1] / 2 "Whitening frequency must be less than or equal to Nyquist frequency."
     num_wins = size(NF.fft,3)
     for i = 1:num_wins
-        NF.fft[:,:,i] = whiten(NF.fft[:,:,i],freqmin,freqmax,NF.fs[1],NF.ns,pad=pad)
+        NF.fft[:,:,i] .= whiten(NF.fft[:,:,i],freqmin,freqmax,NF.fs[1],NF.ns,pad=pad)
     end
     return nothing
 end

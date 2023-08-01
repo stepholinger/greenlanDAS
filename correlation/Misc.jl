@@ -12,10 +12,13 @@ function get_datetime(N::NodalData)
     return datetime
 end
 
+# the indices for this are currently set up to work properly for chans=[331,2391]. may not work for even set of channels!
+# if there's not a "middle channel", this may need to be updated. If statements?
 function cross_cable_stack(C,chans)
 
-    n = chans[end] - (chans[1]-1)
-    midpoint = (chans[1]-1) + Int64(n/2)
+    n = chans[end] - (chans[1])
+    midpoint = (chans[1]) + Int64(n/2)
+    #midpoint = (chans[1]-1) + Int64(n/2)
 
     # get indices for desired channels
     indices = [j for j in combinations(chans,2)]
@@ -32,7 +35,8 @@ function cross_cable_stack(C,chans)
     i = sortperm(indices[:,2])
     sorted_indices = reverse(indices[i,:])
     sorted_corr = reverse(corr[:,i])
-    leg2_indices = (sorted_indices[:,1] .> midpoint .&& sorted_indices[:,2] .> midpoint)
+    leg2_indices = (sorted_indices[:,1] .>= midpoint .&& sorted_indices[:,2] .>= midpoint)
+    #leg2_indices = (sorted_indices[:,1] .> midpoint .&& sorted_indices[:,2] .> midpoint)
     C_leg2 = sorted_corr[:,leg2_indices]
 
     # leg three pairs
@@ -42,7 +46,8 @@ function cross_cable_stack(C,chans)
     i = sortperm(sorted_indices2[:,2])
     sorted_indices2 = reverse(sorted_indices2[i,:],dims=2)
     sorted_corr2 = reverse(sorted_corr2[:,i],dims=1)
-    cross_indices = (sorted_indices2[:,1] .<= midpoint .&& sorted_indices2[:,2] .> midpoint)
+    cross_indices = (sorted_indices2[:,1] .<= midpoint .&& sorted_indices2[:,2] .>= midpoint)
+    #cross_indices = (sorted_indices2[:,1] .<= midpoint .&& sorted_indices2[:,2] .> midpoint)
     leg3_indices = (cross_indices + (reduce(vcat,sum(sorted_indices2,dims=2)) .<= chans[end]+chans[1]-1) .== 2)
     C_leg3 = sorted_corr2[:,leg3_indices]
 
