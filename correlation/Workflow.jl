@@ -17,7 +17,7 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
 # compromise: 
     
     # choose GPU
-    device!(1)    
+    device!(2)    
     
     # read the first file and collect metadata
     N = read_nodal("segy", files[1])
