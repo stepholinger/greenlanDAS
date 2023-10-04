@@ -3,10 +3,10 @@ import SeisNoise: NoiseData
 import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
 import Base:show, size, summary
-include("Types.jl")
-include("Nodal.jl")
-include("Misc.jl")
-include("Workflow.jl")
+include("../Types.jl")
+include("../Nodal.jl")
+include("../Misc.jl")
+include("../Workflow.jl")
 
 # list all 1khz and resampled Greenland files
 path_1khz = "/1-fnp/petasaur/p-wd03/greenland/Store Glacier DAS data/"
@@ -22,26 +22,25 @@ chan_end = 1361
 chans = [chan_start,chan_end]
 
 # set filter band
-freqmin,freqmax = 1,200
-fs = freqmax*2+1
+freqmin,freqmax = 1,100
+fs = 400
 
 # set frequeny and time normalization
-whiten = 0
-time_norm = "none"
+whitening = 0
+time_norm = "1bit"
 
 # set windowing parameters
 cc_len = 10
 maxlag = 1
 
 # choose fk filter bounds
-cmin,cmax = 750,4250
-sgn = "both"
+cmin,cmax = 1500,2250
+sgn = "pos"
 
 # indicate cable geometry (linear or u-shaped)
 geometry = "l"
 
 # subset to some specific files
-#files = files[5583:5710]
 files = files[2:end]
 
 # set substack timing and output path for 1 khz files
@@ -49,8 +48,8 @@ substack_time = Minute(60)
 Ns,Nf = read_nodal("segy", files[1]), read_nodal("segy", files[end])
 start_datetime,end_datetime = get_datetime(Ns),get_datetime(Nf)
 output_times = start_datetime+substack_time:substack_time:end_datetime
-out_path = string("/fd1/solinger/correlations/fk_750_4250/no_whitening_no_1bit/")
+out_path = string("/fd1/solinger/correlations/fk_1500_2250/no_whitening/")
 
 # correlate 1khz files
 NC = workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,
-               time_norm,chans,output_times,out_path,geometry,whiten,30000)
+               time_norm,chans,output_times,out_path,geometry,whitening,30000,"auto",3)

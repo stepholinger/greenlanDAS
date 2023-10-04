@@ -7,7 +7,7 @@ Completed functions for updated workflow
 using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2
 import SeisNoise: NoiseData, resample!, whiten!, abs_max!, clean_up!
 import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
-import FFTW: rfft, irfft
+import FFTW: rfft, irfft, fft, ifft
 import Base:show, size, summary
 include("Types.jl")
 
@@ -96,6 +96,16 @@ function rfft(N::NodalData,dims::Vector{Int64}=[1])
 end
 
 
+# standard SeisNoise fft defined for NodalData
+function fft(N::NodalData,dims::Vector{Int64}=[1])
+    FFT = fft(N.data,dims)
+    ns = size(N.data)[1]
+    return NodalFFTData(N.n,ns,N.ox,N.oy,N.oz,N.info,N.id,N.name,N.loc,
+                        N.fs,N.gain,0.,0.,0,"N/A",N.resp,N.units,N.src,
+                        N.misc,N.notes,false,dims,N.t,FFT)
+end
+
+
 # standard SeisNoise rfft defined for NodalProcessedData
 function rfft(NP::NodalProcessedData,dims::Vector{Int64}=[1])
     FFT = rfft(NP.data,dims)
@@ -104,6 +114,41 @@ function rfft(NP::NodalProcessedData,dims::Vector{Int64}=[1])
                         NP.loc,NP.fs,NP.gain,NP.freqmin,NP.freqmax,NP.cc_len,
                         NP.time_norm,NP.resp,NP.units,NP.src,NP.misc,NP.notes,
                         true,dims,NP.t,FFT)
+end
+
+
+# ifft for NodalFFTData
+function ifft(NF::NodalFFTData,dims::Vector{Int64}=[1])
+    
+    # if inverting all dimensions that have been transformed, return NodalProcessedData or NodalData
+    if dims == NF.dims
+        data = ifft(NF.fft,dims)
+        data = real(data)
+        
+        # check out if input was preprocessed or not, which will determined what
+        # object is returned
+        if NF.preprocessed
+            return NodalProcessedData(NF.n,size(data)[1],NF.ox,NF.oy,NF.oz,NF.info,NF.id,NF.name,
+                    NF.loc,NF.fs,NF.gain,NF.freqmin,NF.freqmax,NF.cc_len,NF.time_norm,
+                    NF.resp,NF.units,NF.src,NF.misc,NF.notes,NF.t,data)
+        else            
+            return NodalData(NF.n,NF.ox,NF.oy,NF.oz,NF.info,NF.id,NF.name,
+                    NF.loc,NF.fs,NF.gain,NF.resp,NF.units,NF.src,NF.misc,NF.notes,NF.t,data)
+        end
+            
+    # if inverting one transform but not the other
+    elseif (dims == [2] && NF.dims == [1,2]) || (dims == [1] && NF.dims == [1,2]) 
+        FFT = ifft(NF.fft,dims)
+        return NodalFFTData(NF.n,NF.ns,NF.ox,NF.oy,NF.oz,NF.info,NF.id,NF.name,
+                        NF.loc,NF.fs,NF.gain,NF.freqmin,NF.freqmax,NF.cc_len,
+                        NF.time_norm,NF.resp,NF.units,NF.src,NF.misc,NF.notes,
+                        NF.preprocessed,[1],NF.t,FFT)
+
+    # if inverting a non-transformed dimension
+    elseif (dims == [1] && NF.dims == [2]) || (dims == [2] && NF.dims == [1]) || (dims == [1,2] && NF.dims == [1]) || (dims == [1,2] && NF.dims == [2])
+        print("Cannot invert along a non-transformed dimension.\n")
+        return nothing
+    end
 end
 
 
@@ -150,6 +195,41 @@ function irfft(NF::NodalFFTData,dims::Vector{Int64}=[1])
     end
 end
 
+# THIS VERSION WORKS FOR FFT, NOT RFFT
+# fk filtering to remove unreasonable phase velocities
+# function fk!(NF::NodalFFTData,cmin::Real,cmax::Real,sgn::String="both")
+    
+#     # get spacing
+#     dx = (NF.misc[2]["shot_point"]-NF.misc[1]["shot_point"])/1000
+    
+#     # note that rfft only reduces the fft size for the first dimension, so here we must use
+#     # rfftfreq for the frequencies but fftfreq (with fftshift) for wavenumbers
+#     f0 = FFTW.fftshift(fftfreq(NF.ns,NF.fs[1]))
+#     k0 = reverse(FFTW.fftshift(fftfreq(Int64(NF.n),1/dx)))
+#     K = k0' .* ones(size(f0)[1],NF.n)
+#     F = ones(size(f0)[1],NF.n) .* f0
+#     C = F./K
+#     filt = zeros(size(NF.fft)[1],NF.n)
+#     if sgn == "both"
+#         filt[abs.(C).>cmin .&& abs.(C).<cmax] .= 1.
+#     elseif sgn == "pos"
+#         filt[C.>cmin .&& C.<cmax] .= 1.
+#     elseif sgn == "neg"
+#         filt[C.<-cmin .&& C.>-cmax] .= 1.
+#     end
+#     filt = ImageFiltering.imfilter(Float32,filt,ImageFiltering.Kernel.gaussian(3),
+#                                    "reflect",ImageFiltering.Algorithm.FIR()) 
+#     if typeof(NF.fft) == CuArray{ComplexF32, 3, CUDA.Mem.DeviceBuffer} || 
+#         typeof(NF.fft) == CuArray{ComplexF32, 2, CUDA.Mem.DeviceBuffer} 
+#         filt = filt |> cu
+#     end
+    
+#     # apply the filter
+#     NF.fft = FFTW.ifftshift(FFTW.fftshift(NF.fft).*filt)
+    
+#     return nothing
+# end
+
 
 # fk filtering to remove unreasonable phase velocities
 function fk!(NF::NodalFFTData,cmin::Real,cmax::Real,sgn::String="both")
@@ -159,14 +239,14 @@ function fk!(NF::NodalFFTData,cmin::Real,cmax::Real,sgn::String="both")
     
     # note that rfft only reduces the fft size for the first dimension, so here we must use
     # rfftfreq for the frequencies but fftfreq (with fftshift) for wavenumbers
-    f0 = FFTW.rfftfreq(NF.ns,NF.fs[1])
-    k0 = FFTW.fftshift(fftfreq(Int64(NF.n),1/dx))
+    f0 = rfftfreq(NF.ns,NF.fs[1])
+    k0 = reverse(FFTW.fftshift(fftfreq(Int64(NF.n),1/dx)))
     K = k0' .* ones(size(f0)[1],NF.n)
     F = ones(size(f0)[1],NF.n) .* f0
     C = F./K
     filt = zeros(size(NF.fft)[1],NF.n)
     if sgn == "both"
-        filt[((C.<-cmin .&& C.>-cmax) + (C.>cmin .&& C.<cmax)) .== 1] .= 1.
+        filt[abs.(C).>cmin .&& abs.(C).<cmax] .= 1.
     elseif sgn == "pos"
         filt[C.>cmin .&& C.<cmax] .= 1.
     elseif sgn == "neg"
@@ -178,9 +258,13 @@ function fk!(NF::NodalFFTData,cmin::Real,cmax::Real,sgn::String="both")
         typeof(NF.fft) == CuArray{ComplexF32, 2, CUDA.Mem.DeviceBuffer} 
         filt = filt |> cu
     end
-    NF.fft = FFTW.fftshift(FFTW.fftshift(NF.fft,[2]).*filt,[2])
+    
+    # apply the filter
+    NF.fft = FFTW.ifftshift(FFTW.fftshift(NF.fft,2).*filt,2)
+    
     return nothing
 end
+
 
 
 function whiten!(NF::NodalFFTData,freqmin::Real, freqmax::Real, pad::Int=50)
@@ -200,28 +284,90 @@ function correlate(NF::NodalFFTData,maxlag::Int)
         Nt,Nc = size(NF.fft)
         Nw = 1
     end
-    Ncorr = Nc * (Nc -1) ÷ 2 
+    #Ncorr = Nc * (Nc - 1) ÷ 2 
+    Ncorr = Nc*(Nc-1)÷2 + Nc 
     Cout = similar(NF.fft,maxlag * 2 + 1,Ncorr,Nw)
     cstart = 0
     cend = 0
-    for ii = 1:Nc-1
+    for ii = 1:Nc
         
         # get output matrix indices
         cstart = cend + 1 
-        cend = cstart + Nc - ii - 1
+        cend = cstart + Nc - ii
         
         # reshape and multiply FFTs
         FFT1 = NF.fft[:,ii,:]
-        FFT2 = NF.fft[:,ii+1:end,:]
+        FFT2 = NF.fft[:,ii:end,:]
         FFT1 = reshape(FFT1,Nt,1,Nw)
         corrT = irfft(conj.(FFT1) .* FFT2,NF.ns,1)
 
         # return corr[-maxlag:maxlag]
         t = vcat(0:Int(NF.ns / 2)-1, -Int(NF.ns / 2):-1)
         ind = findall(abs.(t) .<= maxlag)
-        newind = fftshift(ind,1)
-        Cout[:,cstart:cend,:] .= corrT[newind,:,:]
+        newind = fftshift(ind,1) 
+        Cout[:,cstart:cend,:] .= corrT[newind,:,:] 
     end
+    return Cout
+end
+
+
+function autocorrelate(NF::NodalFFTData,maxlag::Int)
+    if length(size(NF.fft)) == 3
+        Nt,Nc,Nw = size(NF.fft)
+    elseif length(size(NF.fft)) == 2
+        Nt,Nc = size(NF.fft)
+        Nw = 1
+    end
+    Ncorr = Nc 
+    Cout = similar(NF.fft,maxlag * 2 + 1,Ncorr,Nw)
+    cstart = 0
+    cend = 0
+    FFT1 = NF.fft
+    FFT2 = NF.fft
+    corrT = irfft(conj.(FFT1) .* FFT2,NF.ns,1)
+
+    # return corr[-maxlag:maxlag]
+    t = vcat(0:Int(NF.ns / 2)-1, -Int(NF.ns / 2):-1)
+    ind = findall(abs.(t) .<= maxlag)
+    newind = fftshift(ind,1) 
+    Cout .= corrT[newind,:,:] 
+  
+    return Cout
+end
+
+function autocorrelate_cross(NF::NodalFFTData,maxlag::Int,split)
+    if length(size(NF.fft)) == 3
+        Nt,Nc,Nw = size(NF.fft)
+    elseif length(size(NF.fft)) == 2
+        Nt,Nc = size(NF.fft)
+        Nw = 1
+    end
+    
+    # get legs
+    NF_leg_1 = NF.fft[:,1:split-1]
+    NF_leg_2 = reverse(NF.fft[:,split+1:end],dims=2)
+    Ncorr = (split-1)*3
+    Cout = similar(NF.fft,maxlag * 2 + 1,Ncorr,Nw)
+    
+    # leg 1 auto
+    corrT_leg_1 = irfft(conj.(NF_leg_1) .* NF_leg_1,NF.ns,1)
+
+    # leg 2 auto
+    corrT_leg_2 = irfft(conj.(NF_leg_2) .* NF_leg_2,NF.ns,1)
+
+    # cros "auto"
+    corrT_cross = irfft(conj.(NF_leg_1) .* NF_leg_2,NF.ns,1)
+
+    # return corr[-maxlag:maxlag]
+    t = vcat(0:Int(NF.ns / 2)-1, -Int(NF.ns / 2):-1)
+    ind = findall(abs.(t) .<= maxlag)
+    newind = fftshift(ind,1) 
+    
+    # fill output
+    Cout[:,1:split-1,:] .= corrT_leg_1[newind,:,:] 
+    Cout[:,split:2*split-2,:] .= corrT_leg_2[newind,:,:] 
+    Cout[:,2*split-1:end,:] .= corrT_cross[newind,:,:] 
+
     return Cout
 end
 

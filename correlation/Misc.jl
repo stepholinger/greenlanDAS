@@ -69,7 +69,7 @@ end
 function plot_correlations(C,gather,maxlag,chans,source_chan,surface_chan,title_string,fname="",dpi=100,cmap="PuOr")
     if gather == "common shot"
 
-        indices = [j for j in combinations(collect(chans[1]:chans[2]),2)]
+        indices = collect(with_replacement_combinations(collect(chans[1]:chans[2]),2))
         indices = reduce(vcat,transpose.(indices))
 
         ssp_ind = vec(indices[:,1] .== source_chan .|| indices[:,2] .== source_chan)
