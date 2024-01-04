@@ -8,7 +8,7 @@ include("Nodal.jl")
 include("Misc.jl")
 
 
-function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm,
+function workflow_old(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm,
                   chans,output_times,out_path,geometry="l",whitening=1,samples_per_file=[],mode="corr",device=3)
     
 # baseline: resample > fk > detrend/taper/filter > whiten > 1bit > slice > correlate
@@ -190,9 +190,10 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
             NC = NodalCorrData(num_corrs,NF.ox,NF.oy,NF.oz,NF.info,NF.id,NF.name,NF.loc,NF.fs,
                                NF.gain,NF.freqmin,NF.freqmax,cc_len,maxlag,"1bit",true,NF.resp,NF.units,
                                NF.src,NF.misc,NF.notes,NF.t,real(Array(corr_mat)))
-            fname = string(out_path,"correlations_",datetime,".jld2")
+            fname = string(out_path,"correlations_",datetime,"_old.jld2")
             JLD2.save(fname,Dict("NodalCorrData"=>NC))
-
+            println("Saved ",fname," (last file: "*files[i]*")")
+            flush(stdout)
             # clear output matrices
             corr .= 0
             corr_mat .= 0

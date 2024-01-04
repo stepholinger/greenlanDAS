@@ -21,7 +21,8 @@ function cross_cable_stack(C,chans)
     #midpoint = (chans[1]-1) + Int64(n/2)
 
     # get indices for desired channels
-    indices = [j for j in combinations(chans,2)]
+    #indices = [j for j in combinations(chans,2)]
+    indices = collect(with_replacement_combinations(chans,2))
     indices = reduce(vcat,transpose.(indices))
 
     # get correlation functions
@@ -62,7 +63,7 @@ function cross_cable_stack(C,chans)
     leg4_indices = (cross_indices + (reduce(vcat,sum(sorted_indices3,dims=2)) .> chans[end]+chans[1]) .== 2)
     C_leg4 = reverse(sorted_corr3[:,leg4_indices],dims=1)
 
-    return C_leg1+C_leg2+C_leg3+C_leg4
+    return C_leg1+C_leg2#+C_leg3+C_leg4
 end
 
 

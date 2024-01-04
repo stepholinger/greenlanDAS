@@ -1,4 +1,4 @@
-using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates
+using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates, PyCall
 import SeisNoise: NoiseData
 import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
@@ -18,16 +18,16 @@ N = read_nodal("segy", files[1])
 
 # choose channels
 chan_start = 331
-chan_end = 1361
+chan_end = 2391
 chans = [chan_start,chan_end]
 
 # set filter band
-freqmin,freqmax = 1,200
-fs = freqmax*2+1
+freqmin,freqmax = 1,100
+fs = 200
 
 # set frequeny and time normalization
-whiten = 0
-time_norm = "none"
+whitening = 0
+time_norm = "1bit"
 
 # set windowing parameters
 cc_len = 10
@@ -38,19 +38,18 @@ cmin,cmax = 750,4250
 sgn = "both"
 
 # indicate cable geometry (linear or u-shaped)
-geometry = "l"
+geometry = "u"
 
 # subset to some specific files
-#files = files[5583:5710]
-files = files[2:end]
+files = files[end-250:end]
 
 # set substack timing and output path for 1 khz files
 substack_time = Minute(60)
 Ns,Nf = read_nodal("segy", files[1]), read_nodal("segy", files[end])
 start_datetime,end_datetime = get_datetime(Ns),get_datetime(Nf)
 output_times = start_datetime+substack_time:substack_time:end_datetime
-out_path = string("/fd1/solinger/correlations/fk_750_4250/no_whitening_no_1bit/")
+out_path = string("/fd1/solinger/correlations/fk_750_4250/no_whitening/")
 
 # correlate 1khz files
 NC = workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,
-               time_norm,chans,output_times,out_path,geometry,whiten,30000)
+               time_norm,chans,output_times,out_path,geometry,whitening,30000,"corr",1)

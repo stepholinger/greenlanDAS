@@ -344,8 +344,8 @@ function autocorrelate_cross(NF::NodalFFTData,maxlag::Int,split)
     end
     
     # get legs
-    NF_leg_1 = NF.fft[:,1:split-1]
-    NF_leg_2 = reverse(NF.fft[:,split+1:end],dims=2)
+    NF_leg_1 = NF.fft[:,1:split-1,:]
+    NF_leg_2 = reverse(NF.fft[:,split+1:end,:],dims=2)
     Ncorr = (split-1)*3
     Cout = similar(NF.fft,maxlag * 2 + 1,Ncorr,Nw)
     

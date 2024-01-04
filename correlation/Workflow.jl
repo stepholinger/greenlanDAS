@@ -206,6 +206,8 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
                                N.resp,N.units,N.src,N.misc,N.notes,N.t,real(Array(corr_mat)))
             fname = string(out_path,"correlations_",datetime,".jld2")
             JLD2.save(fname,Dict("NodalCorrData"=>NC))
+            println("Saved ",fname," (last file: "*files[i]*")")
+            flush(stdout)
 
             # clear output matrices
             corr .= 0
@@ -219,6 +221,8 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
                                N.resp,N.units,N.src,N.misc,N.notes,N.t,real(Array(corr_mat)))
             fname = string(out_path,"correlations_",datetime,".jld2")
             JLD2.save(fname,Dict("NodalCorrData"=>NC))
+            println("Saved ",fname," (last file: "*files[i]*")")
+            flush(stdout)
 
             # clear output matrices
             corr .= 0

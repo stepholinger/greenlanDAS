@@ -26,7 +26,7 @@ freqmin,freqmax = 1,100
 fs = 400
 
 # set frequeny and time normalization
-whitening = 1
+whitening = 0
 time_norm = "1bit"
 
 # set windowing parameters
@@ -34,7 +34,7 @@ cc_len = 10
 maxlag = 1
 
 # choose fk filter bounds
-cmin,cmax = 1500,2250
+cmin,cmax = 3500,4250
 sgn = "pos"
 
 # indicate cable geometry (linear or u-shaped)
@@ -48,9 +48,8 @@ substack_time = Minute(60)
 Ns,Nf = read_nodal("segy", files[1]), read_nodal("segy", files[end])
 start_datetime,end_datetime = get_datetime(Ns),get_datetime(Nf)
 output_times = start_datetime+substack_time:substack_time:end_datetime
-out_path = string("/fd1/solinger/correlations/fk_1500_2250/")
+out_path = string("/fd1/solinger/correlations/fk_3500_4250/no_whitening/debug/")
 
 # correlate 1khz files
 NC = workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,
-               time_norm,chans,output_times,out_path,geometry,whitening,30000,"auto",3)
-
+               time_norm,chans,output_times,out_path,geometry,whitening,30000,"auto",2)
