@@ -1,6 +1,6 @@
 using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates
 import SeisNoise: NoiseData
-import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
+import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
 import Base:show, size, summary
 include("Types.jl")
@@ -8,67 +8,8 @@ include("Nodal.jl")
 include("Misc.jl")
 
 
-function apply_fk_u_geo(N,cmin,cmax,sgn,split_pt)
-    
-    # split into each leg
-    N_leg_1 = N[1:split_pt]
-    N_leg_2 = N[split_pt+1:end]
-
-    # pad with zeros along spatial axis to avoid wrapping issues
-    # not needed for temporal axis, which has been tapered already
-    pad = zeros(size(N_leg_1.data,1),100)|>cu
-    N_leg_1.data = hcat(pad,N_leg_1.data,pad)
-    N_leg_2.data = hcat(pad,N_leg_2.data,pad)
-    N_leg_1.n = size(N_leg_1.data,2)
-    N_leg_2.n = size(N_leg_2.data,2)
-
-    # take fft for each leg, fk filter, and take ifft
-    NF_leg_1 = rfft(N_leg_1,[1,2])
-    NF_leg_2 = rfft(N_leg_2,[1,2])
-    if sgn == "both"
-        fk!(NF_leg_1,cmin,cmax,sgn)
-        fk!(NF_leg_2,cmin,cmax,sgn)
-    elseif sgn == "pos"
-        fk!(NF_leg_1,cmin,cmax,sgn)
-        fk!(NF_leg_2,cmin,cmax,"neg")
-    elseif sgn == "neg"
-        fk!(NF_leg_1,cmin,cmax,sgn)
-        fk!(NF_leg_2,cmin,cmax,"pos")
-    end
-    N_leg_1 = irfft(NF_leg_1,[1,2])
-    N_leg_2 = irfft(NF_leg_2,[1,2])
-
-    # remove padding and merge
-    pad_bound = size(pad,2)
-    N_leg_1.data = N_leg_1.data[:,pad_bound+1:pad_bound+split_pt]
-    N_leg_2.data = N_leg_2.data[:,pad_bound+1:pad_bound+split_pt-1]
-    N_leg_1.n = split_pt
-    N_leg_2.n = split_pt-1
-    N = merge_channels(N_leg_1,N_leg_2,2)
-    return N
-end
-
-function apply_fk_l_geo(N,cmin,cmax,sgn,num_chans)
-    
-    # pad with zeros
-    pad = zeros(size(N.data,1),100)|>cu
-    N.data = hcat(pad,N.data,pad)
-    N.n = size(N.data,2)
-
-    # take fft, fk filter, and take ifft
-    NF = rfft(N,[1,2])
-    fk!(NF,cmin,cmax,sgn)
-    N = irfft(NF,[1,2])
-
-    # remove padding
-    pad_bound = size(pad,2)                       
-    N.data = N.data[:,pad_bound+1:pad_bound+num_chans]
-    N.n = num_chans
-    return N
-end
-
 function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm,
-                  chans,output_times,out_path,geometry="l",whitening=1,samples_per_file=[],mode="corr",device=3)
+                  chans,output_times,out_path,geometry,whitening,n_per_file,mode="corr",device=3)
     
 # baseline: resample > fk > detrend/taper/filter > whiten > 1bit > slice > correlate
 # optimized: preprocess > rfft > fk > irfft (space) > whiten > correlate
@@ -80,10 +21,10 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
     
     # read the first file and collect metadata
     N = read_nodal("segy", files[1])
-    if isempty(samples_per_file) == true
-        samples_per_file = N.info["orignx"]
+    if isempty(n_per_file) == true
+        n_per_file = N.info["orignx"]
     end
-    seconds_per_file = samples_per_file/N.fs[1]
+    seconds_per_file = n_per_file/N.fs[1]
     num_files = length(files)
     num_chans = chans[2]-chans[1]+1
     
@@ -117,7 +58,7 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
             datetime = get_datetime(N)
 
             # if file is incorrect length, report and go to the next one
-            if size(N.data)[1] != samples_per_file || isempty(N.data) == true
+            if size(N.data)[1] != n_per_file || isempty(N.data) == true
                 msg = "Fewer samples than expected!"
                 error_string = "\nDid not correlate file "*files[i]*"\n"*msg*"\n"
                 write(error_file,error_string)
@@ -199,7 +140,7 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
         gap = next_datetime-datetime
 
         # if the gap would push us past the next output time, write a file
-        if gap > Second(30) && datetime + gap > output_times[next_output_ind]
+        if gap > Second(seconds_per_file) && datetime + gap > output_times[next_output_ind]
             print("Gap (",gap.value/1000/60," mins) at ",datetime," \n")
             NC = NodalCorrData(num_corrs,N.ox,N.oy,N.oz,N.info,N.id,N.name,N.loc,N.fs,
                                N.gain,Float64(freqmin),Float64(freqmax),cc_len,maxlag,"1bit",true,

@@ -1,6 +1,6 @@
 using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates
 import SeisNoise: NoiseData
-import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
+import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
 import Base:show, size, summary
 include("Types.jl")
@@ -176,4 +176,64 @@ function compute_rms(files,freq,filt_type,fs,chans,out_path,samples_per_file=[],
     close(error_file)
 
     return rms_mat,t
+end
+
+
+function apply_fk_u_geo(N,cmin,cmax,sgn,split_pt)
+    
+    # split into each leg
+    N_leg_1 = N[1:split_pt]
+    N_leg_2 = N[split_pt+1:end]
+
+    # pad with zeros along spatial axis to avoid wrapping issues
+    # not needed for temporal axis, which has been tapered already
+    pad = zeros(size(N_leg_1.data,1),100)|>cu
+    N_leg_1.data = hcat(pad,N_leg_1.data,pad)
+    N_leg_2.data = hcat(pad,N_leg_2.data,pad)
+    N_leg_1.n = size(N_leg_1.data,2)
+    N_leg_2.n = size(N_leg_2.data,2)
+
+    # take fft for each leg, fk filter, and take ifft
+    NF_leg_1 = rfft(N_leg_1,[1,2])
+    NF_leg_2 = rfft(N_leg_2,[1,2])
+    if sgn == "both"
+        fk!(NF_leg_1,cmin,cmax,sgn)
+        fk!(NF_leg_2,cmin,cmax,sgn)
+    elseif sgn == "pos"
+        fk!(NF_leg_1,cmin,cmax,sgn)
+        fk!(NF_leg_2,cmin,cmax,"neg")
+    elseif sgn == "neg"
+        fk!(NF_leg_1,cmin,cmax,sgn)
+        fk!(NF_leg_2,cmin,cmax,"pos")
+    end
+    N_leg_1 = irfft(NF_leg_1,[1,2])
+    N_leg_2 = irfft(NF_leg_2,[1,2])
+
+    # remove padding and merge
+    pad_bound = size(pad,2)
+    N_leg_1.data = N_leg_1.data[:,pad_bound+1:pad_bound+split_pt]
+    N_leg_2.data = N_leg_2.data[:,pad_bound+1:pad_bound+split_pt-1]
+    N_leg_1.n = split_pt
+    N_leg_2.n = split_pt-1
+    N = merge_channels(N_leg_1,N_leg_2,2)
+    return N
+end
+
+function apply_fk_l_geo(N,cmin,cmax,sgn,num_chans)
+    
+    # pad with zeros
+    pad = zeros(size(N.data,1),100)|>cu
+    N.data = hcat(pad,N.data,pad)
+    N.n = size(N.data,2)
+
+    # take fft, fk filter, and take ifft
+    NF = rfft(N,[1,2])
+    fk!(NF,cmin,cmax,sgn)
+    N = irfft(NF,[1,2])
+
+    # remove padding
+    pad_bound = size(pad,2)                       
+    N.data = N.data[:,pad_bound+1:pad_bound+num_chans]
+    N.n = num_chans
+    return N
 end
