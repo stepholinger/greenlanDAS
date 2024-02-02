@@ -4,7 +4,7 @@ Define necessary structures for handling DAS data with SeisNoise functionality
 
 """
 
-using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2
+using SeisNoise, SeisIO, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2
 import SeisNoise: NoiseData
 import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
