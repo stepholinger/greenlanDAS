@@ -1,4 +1,4 @@
-using SeisNoise, SeisIO, Glob, HDF5, Combinatorics, JLD2
+using SeisNoise, SeisBase, Glob, HDF5, Combinatorics, JLD2
 include("Types.jl")
 include("Nodal.jl")
 include("Misc.jl")

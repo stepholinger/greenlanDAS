@@ -6,7 +6,7 @@ Completed functions for updated workflow
 
 using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2
 import SeisNoise: NoiseData, resample!, whiten!, abs_max!, clean_up!
-import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
+import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft, fft, ifft
 import Base:show, size, summary
 include("Types.jl")
@@ -307,6 +307,39 @@ function correlate(NF::NodalFFTData,maxlag::Int)
         newind = fftshift(ind,1) 
         Cout[:,cstart:cend,:] .= corrT[newind,:,:] 
     end
+    return Cout
+end
+
+
+function correlate_single(NF::NodalFFTData,maxlag::Int)
+    if length(size(NF.fft)) == 3
+        Nt,Nc,Nw = size(NF.fft)
+    elseif length(size(NF.fft)) == 2
+        Nt,Nc = size(NF.fft)
+        Nw = 1
+    end
+    #Ncorr = Nc * (Nc - 1) ÷ 2 
+    Ncorr = Nc
+    Cout = similar(NF.fft,maxlag * 2 + 1,Ncorr,Nw)
+    cstart = 0
+    cend = 0
+        
+    # get output matrix indices
+    cstart = cend + 1 
+    cend = cstart + Nc - 1
+
+    # reshape and multiply FFTs
+    FFT1 = NF.fft[:,1,:]
+    FFT2 = NF.fft[:,1:end,:]
+    FFT1 = reshape(FFT1,Nt,1,Nw)
+    corrT = irfft(conj.(FFT1) .* FFT2,NF.ns,1)
+
+    # return corr[-maxlag:maxlag]
+    t = vcat(0:Int(NF.ns / 2)-1, -Int(NF.ns / 2):-1)
+    ind = findall(abs.(t) .<= maxlag)
+    newind = fftshift(ind,1) 
+    Cout[:,cstart:cend,:] .= corrT[newind,:,:] 
+        
     return Cout
 end
 

@@ -1,4 +1,4 @@
-using SeisNoise, SeisIO, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates, PyCall
+using SeisNoise, SeisBase, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates, PyCall
 include("Types.jl")
 include("Nodal.jl")
 include("Misc.jl")

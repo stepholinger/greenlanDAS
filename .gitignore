@@ -1,7 +1,9 @@
 borehole_data/
 figures/
+imagery/
 *mseed
 *h5
 *png
 *jld2
-*pickle
+*nc
+*zip

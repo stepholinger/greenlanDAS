@@ -1,6 +1,6 @@
 using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates
 import SeisNoise: NoiseData
-import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
+import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
 import Base:show, size, summary
 include("Types.jl")
@@ -35,6 +35,8 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
     num_corrs = 0
     if mode == "corr"
         num_corrs = Int64(num_chans*(num_chans-1)/2)+num_chans
+    elseif mode == "single_corr"
+        num_corrs = num_chans
     elseif mode == "auto"
         num_corrs = Int64(num_chans)
     elseif mode == "auto_cross"
@@ -107,6 +109,8 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
             NF = rfft(NP,[1])
             if mode == "corr"
                 corr = correlate(NF,Int64(maxlag*NF.fs[1]))
+            elseif mode == "single_corr"
+                corr = correlate_single(NF,Int64(maxlag*NF.fs[1]))
             elseif mode == "auto"
                 corr = autocorrelate(NF,Int64(maxlag*NF.fs[1]))
             elseif mode == "auto_cross"

@@ -1,6 +1,6 @@
 using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates
 import SeisNoise: NoiseData
-import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
+import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
 import Base:show, size, summary
 include("Types.jl")
@@ -67,36 +67,6 @@ function cross_cable_stack(C,chans)
 end
 
 
-function plot_correlations(C,gather,maxlag,chans,source_chan,surface_chan,title_string,fname="",dpi=100,cmap="PuOr")
-    if gather == "common shot"
-
-        indices = collect(with_replacement_combinations(collect(chans[1]:chans[2]),2))
-        indices = reduce(vcat,transpose.(indices))
-
-        ssp_ind = vec(indices[:,1] .== source_chan .|| indices[:,2] .== source_chan)
-
-        # get channel spacing
-        spacing = (C.misc[4]["shot_point"]-C.misc[3]["shot_point"])/1000
-        profile_start = (indices[ssp_ind,1][1] - surface_chan) * spacing
-        profile_end = (indices[ssp_ind,2][end] - surface_chan) * spacing
-
-        # make a plot of the correlations
-        figure(figsize=(10,10))
-        extent=[-maxlag,maxlag,profile_end,profile_start]
-        imshow(C.corr[:,ssp_ind]', cmap=cmap, interpolation=:none, aspect="auto",extent=extent)
-        ylabel("Distance from surface (m)",fontsize=15)
-        xlabel("Lag (s)",fontsize=15)
-        xticks(fontsize=12)
-        yticks(fontsize=12)
-        PyPlot.title(title_string)
-    elseif gather == "common_midpoint"
-    end
-    if fname != ""
-        savefig(fname,dpi=dpi)
-    end
-end
-
-
 function compute_rms(files,freq,filt_type,fs,chans,out_path,samples_per_file=[],files_per_save=1e10)
     
     # read the first file and collect metadata
@@ -108,7 +78,6 @@ function compute_rms(files,freq,filt_type,fs,chans,out_path,samples_per_file=[],
     seconds_per_file = samples_per_file/N.fs[1]
     num_files = length(files)
     num_chans = chans[2]-chans[1]+1
-    midpoint = Int64(chans[1]+(chans[2]+1-chans[1])/2-1)
 
     # make output matrix and dummy NodalFFTData
     rms_mat = zeros(Int64(num_chans),Int64(size(files,1)))
