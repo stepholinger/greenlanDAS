@@ -4,7 +4,7 @@ Completed functions for updated workflow
 
 """
 
-using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2
+using SeisNoise, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2
 import SeisNoise: NoiseData, resample!, whiten!, abs_max!, clean_up!
 import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft, fft, ifft

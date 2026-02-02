@@ -1,12 +1,12 @@
-using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates, PyCall
+using SeisNoise, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates
 import SeisNoise: NoiseData
-import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
+import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
 import Base:show, size, summary
-include("../functions/Types.jl")
-include("../functions/Nodal.jl")
-include("../functions/Misc.jl")
-include("../functions/Workflow.jl")
+include("functions/Types.jl")
+include("functions/Nodal.jl")
+include("functions/Misc.jl")
+include("functions/Workflow.jl")
 
 # list all 1khz and resampled Greenland files
 path_1khz = "/1-fnp/petasaur/p-wd03/StoreGlacier/"
