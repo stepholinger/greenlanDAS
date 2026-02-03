@@ -1,4 +1,4 @@
-using SeisNoise, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates
+using SeisNoise, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates, PyCall
 import SeisNoise: NoiseData
 import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
@@ -105,4 +105,4 @@ out_path = string("/1-fnp/psound/psound-wd3/greenland/correlations/fk_3500_4250/
 
 # correlate 1khz files
 NC = workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,
-               time_norm,chans,output_times,out_path,geometry,whitening,30000,"auto_cross",2)
+               time_norm,chans,output_times,out_path,geometry,whitening,30000,"auto_cross",0)
