@@ -1,16 +1,16 @@
-using SeisNoise, PyPlot, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates, PyCall
+using SeisNoise, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates, PyCall
 import SeisNoise: NoiseData
-import SeisIO: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
+import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
 import Base:show, size, summary
-include("../Types.jl")
-include("../Nodal.jl")
-include("../Misc.jl")
-include("../Workflow.jl")
+include("functions/Types.jl")
+include("functions/Nodal.jl")
+include("functions/Misc.jl")
+include("functions/Workflow.jl")
 
 # list all 1khz and resampled Greenland files
-path_1khz = "/1-fnp/petasaur/p-wd03/greenland/Store Glacier DAS data/"
-path_resampled = "/1-fnp/pnwstore1/p-wd05/greenland/data/resampled"
+path_1khz = "/1-fnp/petasaur/p-wd03/StoreGlacier/"
+path_resampled = "/1-fnp/psound/psound-wd3/greenland/resampled"
 files_1khz = glob("1kHz/*",path_1khz)
 files_resampled = glob("*",path_resampled)
 files = cat(files_1khz,files_resampled,dims=1)
@@ -54,8 +54,8 @@ def load_pickle(fpath):
 load_pickle = py"load_pickle"
 
 # load detection times and predictions
-detection_file = "/home/solinger/detections/eqt_funcs/detection_times.pickle"
-prediction_file = "/home/solinger/detections/eqt_funcs/detection_predictions.pickle"
+detection_file = "detection_times.pickle"
+prediction_file = "detection_predictions.pickle"
 detection_times = load_pickle(detection_file)
 predictions = load_pickle(prediction_file)
 
@@ -101,8 +101,8 @@ substack_time = Minute(10)
 Ns,Nf = read_nodal("segy", files[1]), read_nodal("segy", files[end])
 start_datetime,end_datetime = get_datetime(Ns),get_datetime(Nf)
 output_times = start_datetime+substack_time:substack_time:end_datetime
-out_path = string("/fd1/solinger/correlations/fk_1500_2250/no_whitening/10_min/icequakes_removed/")
+out_path = string("/1-fnp/psound/psound-wd3/greenland/correlations/fk_1500_2250/no_whitening/10_min/icequakes_removed/")
 
 # correlate 1khz files
 NC = workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,
-               time_norm,chans,output_times,out_path,geometry,whitening,30000,"auto_cross",3)
+	      time_norm,chans,output_times,out_path,geometry,whitening,30000,"auto_cross",0)

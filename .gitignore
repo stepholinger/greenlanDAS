@@ -8,3 +8,4 @@ imagery/
 *nc
 *zip
 2026-rerun/obspy_local/*
+2026-rerun/.julia*

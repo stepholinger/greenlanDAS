@@ -104,5 +104,5 @@ output_times = start_datetime+substack_time:substack_time:end_datetime
 out_path = string("/1-fnp/psound/psound-wd3/greenland/correlations/fk_3500_4250/no_whitening/10_min/icequakes_removed/")
 
 # correlate 1khz files
-NC = workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,
+NC = workflow(files[2984:end],cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,
                time_norm,chans,output_times,out_path,geometry,whitening,30000,"auto_cross",0)
