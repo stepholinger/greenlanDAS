@@ -256,10 +256,9 @@ end
 
 
 # make a helper function to get files and datetimes 
-function get_files_and_datetimes(cmin,cmax)
+function get_files_and_datetimes(cmin,cmax,path)
 
     # list files
-    path = string("/fd1/solinger/correlations/fk_",cmin,"_",cmax,"/no_whitening/10_min/icequakes_removed/")
     files = glob("*.jld2",path)
     files = files[BitVector(1 .- contains.(files,"autocorrelation"))]
     files = files[BitVector(1 .- contains.(files,"datetimes"))]
