@@ -311,7 +311,7 @@ function correlate(NF::NodalFFTData,maxlag::Int)
 end
 
 
-function correlate_single(NF::NodalFFTData,maxlag::Int)
+function correlate_single(NF::NodalFFTData,maxlag::Int,source_chan::Int)
     if length(size(NF.fft)) == 3
         Nt,Nc,Nw = size(NF.fft)
     elseif length(size(NF.fft)) == 2
@@ -329,7 +329,7 @@ function correlate_single(NF::NodalFFTData,maxlag::Int)
     cend = cstart + Nc - 1
 
     # reshape and multiply FFTs
-    FFT1 = NF.fft[:,1,:]
+    FFT1 = NF.fft[:,source_chan,:]
     FFT2 = NF.fft[:,1:end,:]
     FFT1 = reshape(FFT1,Nt,1,Nw)
     corrT = irfft(conj.(FFT1) .* FFT2,NF.ns,1)

@@ -1,27 +1,19 @@
-using SeisNoise, SeisBase, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates
+using SeisNoise, SeisBase, CUDA, Glob, HDF5, Combinatorics, Random, Statistics, ImageFiltering, FFTW, JLD2, Dates, NetCDF, DataFrames
 import SeisNoise: NoiseData 
 import SeisBase: read_nodal, NodalData, InstrumentPosition, InstrumentResponse, show_str, show_t, show_x, show_os
 import FFTW: rfft, irfft
-import DSP: hilbert
-import Images: findlocalmaxima
 import Base:show, size, summary
 import PyCall
-import SeisDvv
-import Dates
-import FiniteDifferences
-import CSV
-using NetCDF
-using DataFrames
-include("../correlation/functions/Types.jl")
-include("../correlation/functions/Nodal.jl")
-include("../correlation/functions/Misc.jl")
-include("../correlation/functions/Workflow.jl")
-include("../correlation/functions/Dvv.jl")
+include("functions/Types.jl")
+include("functions/Nodal.jl")
+include("functions/Misc.jl")
+include("functions/Workflow.jl")
+include("functions/Dvv.jl")
 
 #------CONSOLIDATE AUTOCORRELATIONS-------
 
 # set path to correlation files
-path = string("/1-fnp/psound/psound-wd3/greenland/correlations/fk_1500_2250/no_whitening/10_min/icequakes_removed/")
+path_strs = [string("/1-fnp/psound/psound-wd3/greenland/correlations/fk_"),string("/no_whitening/10_min/icequakes_removed/")]
 
 # set number of samples and correlations
 ns = 801
@@ -31,26 +23,36 @@ ncorr = 3090
 restack_interval = 10
 
 # which fk band?
-clims = [[3500,4250],[1500,2250]]
+#clims = [[3500,4250],[1500,2250]]
+clims = [[3500,4250]]
 
 # frequency bands to return and which bands to process later (one at a time; use 1 if only ran for a single band)
 bands = [[10. 13.];]
 band = 1
 
-# consolidate autocorrelations into one file
-for clim in clims:
-  
-  # get files and datetimes
-  files, path, datetimes = get_files_and_datetimes(clim[1],clim[2])
+# skip consolidation if we did it already (basically for debugging)
+skip_consolidation = true
 
-  # get autocorrs
-  restack_times, all_autocorrs = collect_autocorrs(files,datetimes,restack_interval,ns,ncorr,bands)
+# consolidate autocorrelations into one file
+if skip_consolidation
+  for clim in clims
   
-  # save the autocorrelations and datetime information
-  fname = string(path,"autocorrelations_",Int(bands[1,1]),"-",Int(bands[end,2]),"Hz_",restack_interval,"_min_stack.jld2")
-  JLD2.save(fname,Dict("autocorrs"=>all_autocorrs))
-  fname = string(path,"datetimes_",restack_interval,"_min_stack.jld2")
-  JLD2.save(fname,Dict("datetimes"=>collect(restack_times)))
+    # set path
+    path = string(path_strs[1],clim[1],"_",clim[2],path_strs[2])
+
+    # get files and datetimes
+    files, datetimes = get_files_and_datetimes(path)
+
+    # get autocorrs
+    restack_times, all_autocorrs = collect_autocorrs(files,datetimes,restack_interval,ns,ncorr,bands)
+  
+    # save the autocorrelations and datetime information
+    fname = string(path,"autocorrelations_",Int(bands[1,1]),"-",Int(bands[end,2]),"Hz_",restack_interval,"_min_stack.jld2")
+    JLD2.save(fname,Dict("autocorrs"=>all_autocorrs))
+    fname = string(path,"datetimes_",restack_interval,"_min_stack.jld2")
+    JLD2.save(fname,Dict("datetimes"=>collect(restack_times)))
+  end
+end
 
 #------NOW LETS SET UP THE DVV PARAMETERS-------
 
@@ -60,10 +62,11 @@ method = "stretching"
 dvlims = [-0.2,0.2]
 ntrial = 100
 ref_type = ["time_avg"]
-tlims = [[0.3,0.8],[0.0,0.3]]
+#tlims = [[0.0,0.3],[0.3,0.8]]
+tlims = [[0.05,0.35]]
 restack_intervals = [10]
 sides = ["pos","neg"]
-modes = ["dx"]
+modes = ["dt"]
 
 # choose any time periods to skip due to gaps, icequakes, etc
 skip_time = [DateTime(2019,7,7,13),DateTime(2019,7,7,14)]
@@ -92,7 +95,7 @@ for parameter in parameters
     start_time = DateTime(2019,7,6,10)
 
     # load autocorrelations
-    path = string("/fd1/solinger/correlations/fk_",clim[1],"_",clim[2],"/no_whitening/10_min/icequakes_removed/")
+    path = string(path_strs[1],clim[1],"_",clim[2],path_strs[2])
     fname = string(path,"autocorrelations_",Int(bands[1,1]),"-",Int(bands[end,2]),"Hz_",restack_interval,"_min_stack.jld2")
     autocorrs = JLD2.load(fname)["autocorrs"]
 

@@ -256,7 +256,7 @@ end
 
 
 # make a helper function to get files and datetimes 
-function get_files_and_datetimes(cmin,cmax,path)
+function get_files_and_datetimes(path)
 
     # list files
     files = glob("*.jld2",path)
@@ -270,5 +270,5 @@ function get_files_and_datetimes(cmin,cmax,path)
         datetimes = vcat(datetimes,DateTime(string("2019"*split(split(files[i],"_2019")[2],".jld2")[1])))
     end
     
-    return files, path, datetimes
+    return files, datetimes
 end

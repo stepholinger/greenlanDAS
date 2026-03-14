@@ -9,7 +9,7 @@ include("Misc.jl")
 
 
 function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm,
-                  chans,output_times,out_path,geometry,whitening,n_per_file,mode="corr",device=3)
+                  chans,output_times,out_path,geometry,whitening,n_per_file,mode="corr",device=3,source_chan=1)
     
 # baseline: resample > fk > detrend/taper/filter > whiten > 1bit > slice > correlate
 # optimized: preprocess > rfft > fk > irfft (space) > whiten > correlate
@@ -105,12 +105,14 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
                        N.loc,fs*ones(N.n),N.gain,Float64(freqmin),Float64(freqmax),cc_len,"1bit",
                        N.resp,N.units,N.src,N.misc,N.notes,N.t,sliced_data)
 
+	    
             # cross correlate
             NF = rfft(NP,[1])
-            if mode == "corr"
+            #println(Array(NF.fft))
+	    if mode == "corr"
                 corr = correlate(NF,Int64(maxlag*NF.fs[1]))
             elseif mode == "single_corr"
-                corr = correlate_single(NF,Int64(maxlag*NF.fs[1]))
+                corr = correlate_single(NF,Int64(maxlag*NF.fs[1]),source_chan-chans[1])
             elseif mode == "auto"
                 corr = autocorrelate(NF,Int64(maxlag*NF.fs[1]))
             elseif mode == "auto_cross"
@@ -119,6 +121,8 @@ function workflow(files,cc_len,maxlag,freqmin,freqmax,fs,cmin,cmax,sgn,time_norm
             corr_mat .= corr_mat .+ sum(corr,dims=3)
             println("Summed correlations for "*files[i])
             flush(stdout)
+
+            #println(corr)
 
         # exception handling
 #         catch error
